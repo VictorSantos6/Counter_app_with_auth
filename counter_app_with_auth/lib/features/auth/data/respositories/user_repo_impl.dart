@@ -9,8 +9,8 @@ class UserRepoImpl implements UserRepository{
   Future<void> deleteUser(String id)async {
     try {
       await FirebaseFirestore.instance.collection("users").doc(id).delete();
-    } catch (e) {
-      throw Exception("Error deleting user: $e");
+    } on FirebaseException {
+      rethrow;
     }
   }
 
@@ -18,20 +18,27 @@ class UserRepoImpl implements UserRepository{
   Future<UserEntity> getUser(String id)async {
     try {
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection("users").doc(id).get();
+      if (!doc.exists || doc.data() == null) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'not-found',
+          message: 'User document not found',
+        );
+      }
       final userModel = UserModels.fromJson(doc.data() as Map<String,dynamic>);
       return userModel.toEntity();
-    } catch (e) {
-      throw Exception("Error getting user: $e");
+    } on FirebaseException {
+      rethrow;
     }
   }
 
   @override
   Future<void> updateUser(UserEntity user)async {
     try {
-      final model = UserModels(id: user.id, name: user.id, email: user.email);
+      final model = UserModels(id: user.id, name: user.name, email: user.email);
       await FirebaseFirestore.instance.collection("users").doc(user.id).update(model.toJson());
-    } catch (e) {
-      throw Exception("Error updating user: $e");
+    } on FirebaseException {
+      rethrow;
     }
   }
   
@@ -39,9 +46,12 @@ class UserRepoImpl implements UserRepository{
   Future<void> createUser(UserEntity user)async {
     try {
       final userModel = UserModels(id: user.id, name: user.name, email: user.email);
-      await FirebaseFirestore.instance.collection('users').add(userModel.toJson());
-    } catch (e) {
-      throw Exception("Error creating user: $e");
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.id)
+          .set(userModel.toJson());
+    } on FirebaseException {
+      rethrow;
     }
   }
 
